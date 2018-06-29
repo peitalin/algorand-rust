@@ -1,0 +1,7 @@
+[package]
+name = "algorand"
+version = "0.1.0"
+authors = ["Peita Lin <n6378056@gmail.com>"]
+
+[dependencies]
+ring = "0.12.1"
