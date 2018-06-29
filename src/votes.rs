@@ -1,9 +1,11 @@
 
 use std::fmt;
+use std::hash::{ Hash, Hasher };
+use std::collections::hash_map::DefaultHasher;
 use ring::digest::{ digest, SHA256, Digest };
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Eq)]
 pub enum Vote {
     Value(i32),
     NullVote,
@@ -18,6 +20,16 @@ impl PartialEq for Vote {
         }
     }
 }
+impl Hash for Vote {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let mut hasher = DefaultHasher::new();
+        match &self {
+            Vote::Value(x) => Hash::hash_slice(x.to_string().as_bytes(), &mut hasher),
+            Vote::NullVote => Hash::hash_slice(b"NullVote", &mut hasher),
+        }
+    }
+}
+
 
 pub fn signature(input: &str) -> String {
     let result = digest(&SHA256, input.as_bytes());
