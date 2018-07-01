@@ -10,6 +10,11 @@ pub enum Vote {
     Value(i32),
     NullVote,
 }
+impl Default for Vote {
+    fn default() -> Vote {
+        Vote::NullVote
+    }
+}
 impl PartialEq for Vote {
     fn eq(&self, other: &Vote) -> bool {
         // println!("Eq: {:?} == {:?}", &self, other);
@@ -21,7 +26,7 @@ impl PartialEq for Vote {
     }
 }
 impl Hash for Vote {
-    fn hash<H: Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, _state: &mut H) {
         let mut hasher = DefaultHasher::new();
         match &self {
             Vote::Value(x) => Hash::hash_slice(x.to_string().as_bytes(), &mut hasher),
