@@ -53,27 +53,28 @@ fn main() {
 
 
 fn BA1<'a>(p: u32, users: Vec<&SIG>) -> (Vote, u32) {
-    // Value proposal
+    //! Byzantine Agreement Protocol
 
     let votes: Vec<&Vote> = users.iter().map(|&user: &&SIG| &user.vote).collect();
-    let voteCounts = vote_counter(votes);
-    let vt = majority_vote(voteCounts);
+    let voteCounter = vote_counter(votes);
+    println!("\nVoteCounter: {:?}\n", voteCounter);
+    let majority_vote = majority_vote(voteCounter);
 
-    if check_next_null_votes(p, &users) {
-        if p > 1 {
-        }
-        println!("\nMajority voted: {:?} {:?} times ", vt.0, vt.1);
-        return vt
+    // STEP 1: [Value Proposal]
+    if majority_votes_next_null(p, &users) {
+        println!("\nMajority voted: {:?} {:?} times ", majority_vote.0, majority_vote.1);
+        // then i proposes vi, which he propagates together with his period p credential;
+        return majority_vote
     } else {
-        // else if p == 2 && !majority_vote()
-        println!("\nMajority voted: {:?} {:?} times ", vt.0, vt.1);
-        return vt
+        println!("\nMajority voted: {:?} {:?} times ", majority_vote.0, majority_vote.1);
+        // then i proposes v, which he propagates together with his period p credential.
+        return majority_vote
     }
 
 }
 
 
-fn check_next_null_votes(p: u32, users: &Vec<&SIG>) -> bool {
+fn majority_votes_next_null(p: u32, users: &Vec<&SIG>) -> bool {
     //! Description: checks if 2*t+1 (t: malicious nodes) votes are
     //!     votes from previous period p-1 are (next-vote, NullVote)
     //! Params:
@@ -83,11 +84,14 @@ fn check_next_null_votes(p: u32, users: &Vec<&SIG>) -> bool {
     // HOW do you know how big t should be?
     let mut next_null_vote_count = 0;
     for user in users {
+        // counter all (Next-vote, NullVotes)
         match (&user.vote, &user.message) {
             (Vote::NullVote, MessageType::NEXT) => next_null_vote_count += 1,
             _ => continue,
         }
     }
+    // Page 4, Jing Chen, Sergey Gorbunov, Silvio Micali, Georgios Vlachos
+    // If p=1 or (p >= 2 AND i has received 2t+1 next-votes for ⊥ NullVote in period p-1)
     match (p, next_null_vote_count) {
         (1, _) => true,
         (_, nnvc) => {
@@ -106,19 +110,20 @@ fn vote_counter<'a>(votes: Vec<&Vote>) -> HashMap<Vote, u32> {
     let mut counter: HashMap<Vote, u32> = HashMap::new();
     use Vote::*;
     for v in votes {
+        // iterate and count votes for each value
         match v {
             Vote::Value(n) => *counter.entry(Value(*n)).or_insert(0) += 1,
             _ => *counter.entry(NullVote).or_insert(0) += 1,
         }
     }
-    println!("\nVoteCounter: {:?}\n", counter);
     counter
 }
 
 
+
 fn maxHashMap<K, V>(hash_map: HashMap<K, V>) -> (K, V)
 where K: Hash + Eq + Debug + Default, V: Ord + Debug + Default {
-    //! Return the (Key, Value) pair with the largest value in the hash_map
+    //! DESCRIPTION: Return the (Key, Value) pair with the largest value in the hash_map
     let mut maxKey: K = K::default();
     let mut maxVal: V = V::default();
     for (key, value) in hash_map {
@@ -129,11 +134,10 @@ where K: Hash + Eq + Debug + Default, V: Ord + Debug + Default {
     }
     (maxKey, maxVal)
 }
-
-
 fn majority_vote(voteCounts: HashMap<Vote, u32>) -> (Vote, u32) {
-    //! Has user i received 2t + 1 next-votes for ⊥ in period p - 1
-    //! count number of NullVotes, return majority: v or NullVote
+    //! DESCRIPTION:
+    //!     Check if user i received 2t + 1 next-votes for ⊥ (NullVote) in period p - 1
+    //!     count number of NullVotes, return majority: v or NullVote
     let (maxVoteKey, maxVoteVal) = maxHashMap(voteCounts);
     // let totalVotes  = voteCounts.iter().map(|(k, &v)| v).fold(0, |acc, i| acc+i);
     // let countValue = votes.iter().filter(|&n| *n != &Vote::NullVote).count() as i32;
