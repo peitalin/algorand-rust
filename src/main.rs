@@ -33,47 +33,54 @@ fn main() {
     let user_q = SIG::new(&"q", Vote::NullVote,  MessageType::NEXT);
     let user_r = SIG::new(&"r", Vote::NullVote,  MessageType::NEXT);
     let users = vec![
-        &user_i, &user_j, &user_k, &user_l, &user_m,
-        &user_n, &user_o, &user_p, &user_q, &user_r,
+        user_i, user_j, user_k, user_l, user_m,
+        user_n, user_o, user_p, user_q, user_r,
     ];
-    for &user in &users {
+    for user in &users {
         println!("User {}: {:?}", &user.user, &user);
     }
     // STEP 1: Value Proposal
-    let vt = algorand_agreement(2, users, String::from("i"));
-    // println!("v: {}\tsig: {}", v, sig);
+    let (propagated_vote, user_signature) = algorand_agreement(2, users, String::from("i"));
+    println!("Propagated Vote: {:?}\tSignature: {}", propagated_vote, user_signature);
 }
 
 
 
 
-fn algorand_agreement<'a>(p: u32, users: Vec<&SIG>, user_id: String) -> (Vote, String) {
+fn algorand_agreement<'a>(p: u32, users: Vec<SIG>, user_id: String) -> (Vote, String) {
     //! Byzantine Agreement Protocol
-    let user = users.iter().filter(|&user| *user.user == user_id).take(1);
+    //!     Params:
+    //!         p: period
+    //!         users: vector of other users's SIG messages (user, vote, message, signature)
+    //!         user_id: user's id
+    // let user: Vec<&SIG> = users.iter().filter(|user| user.user == user_id).collect();
+    let user = users.iter()
+        .filter(|user| user.user == user_id)
+        .collect::<Vec<&SIG>>()[0];
 
-    let votes: Vec<&Vote> = users.iter().map(|&user: &&SIG| &user.vote).collect();
+    let votes: Vec<Vote> = users.iter().map(|sig| sig.vote).collect();
 
     let voteCounter = vote_counter(&votes);
 
     let (majority_vote, majority_vote_count) = majority_vote(&voteCounter);
 
-    println!("USER: {:?}\nVoteCounter: {:?}\n", user, voteCounter);
+    println!("\nUser: {:?}\nVoteCounter: {:?}", user, voteCounter);
 
     // STEP 1: [Value Proposal]
     if majority_votes_next_null(p, &users) {
-        println!("\nMajority voted: {:?} {:?} times, propagating {:?}",
-                 majority_vote, majority_vote_count, user_id);
+        println!("\nMajority voted: {:?} {:?} times, user {} propagates: {:?}",
+                 majority_vote, majority_vote_count, &user_id, &user.vote);
         // then i proposes vi, which he propagates together with his period p credential;
-        return (majority_vote, "asdf".to_string())
+        return (user.vote, user.signature.clone())
     } else {
         println!("\nMajority voted: {:?} {:?} times", majority_vote, majority_vote_count);
         // then i proposes v, which he propagates together with his period p credential.
-        return (majority_vote, "asdf".to_string())
+        return (majority_vote, user.signature.clone())
     }
 }
 
 
-fn majority_votes_next_null(p: u32, users: &Vec<&SIG>) -> bool {
+fn majority_votes_next_null(p: u32, users: &Vec<SIG>) -> bool {
     //! Description: checks if 2*t+1 (t: malicious nodes) votes are
     //!     votes from previous period p-1 are (next-vote, NullVote)
     //! Params:
@@ -107,7 +114,7 @@ fn majority_votes_next_null(p: u32, users: &Vec<&SIG>) -> bool {
 
 
 
-fn vote_counter(votes: &Vec<&Vote>) -> HashMap<Vote, u32> {
+fn vote_counter(votes: &Vec<Vote>) -> HashMap<Vote, u32> {
     //! Creates a Hashmap of votes, and their counts
     let mut counter: HashMap<Vote, u32> = HashMap::new();
     use Vote::*;
