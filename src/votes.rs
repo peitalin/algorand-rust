@@ -2,6 +2,7 @@
 use std::fmt;
 use std::hash::{ Hash, Hasher };
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use ring::digest::{ digest, SHA256, Digest };
 
 
@@ -65,6 +66,11 @@ impl<'a> SIG<'a> {
             signature: signature(i), // signature
         }
     }
+
+    pub fn update_vote(&mut self, v: Vote) {
+        self.vote = v;
+    }
+
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "\n\t\t(User: {}, \n\t\tVote: {:?}, \n\t\tMessage: {:?}, \n\t\tSignature: {:?})",
            self.user,
@@ -74,5 +80,6 @@ impl<'a> SIG<'a> {
        )
     }
 }
+
 
 

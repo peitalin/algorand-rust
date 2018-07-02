@@ -16,26 +16,22 @@ use std::fmt::Debug;
 use serde_json::{ Value, Error };
 
 
-
 fn main() {
-
     let user_i = SIG {
         user: &String::from("i"),
         vote: Vote::Value(33),
         message: MessageType::CERT,
         signature: signature(&String::from("idasdf"))
     };
-    // let user_i = SIG::new(&"i", Vote::Value(1) MessageType::CERT);
-    let user_j = SIG::new(&"j", Vote::Value(33),  MessageType::SOFT);
+    let user_j = SIG::new(&"j", Vote::Value(33), MessageType::SOFT);
     let user_k = SIG::new(&"k", Vote::Value(33), MessageType::CERT);
     let user_l = SIG::new(&"l", Vote::Value(33), MessageType::NEXT);
-    let user_m = SIG::new(&"m", Vote::Value(33),  MessageType::NEXT);
-    let user_n = SIG::new(&"n", Vote::Value(44),  MessageType::NEXT);
+    let user_m = SIG::new(&"m", Vote::Value(33), MessageType::NEXT);
+    let user_n = SIG::new(&"n", Vote::Value(44), MessageType::NEXT);
     let user_o = SIG::new(&"o", Vote::NullVote,  MessageType::NEXT);
     let user_p = SIG::new(&"p", Vote::NullVote,  MessageType::NEXT);
     let user_q = SIG::new(&"q", Vote::NullVote,  MessageType::NEXT);
     let user_r = SIG::new(&"r", Vote::NullVote,  MessageType::NEXT);
-
     let users = vec![
         &user_i, &user_j, &user_k, &user_l, &user_m,
         &user_n, &user_o, &user_p, &user_q, &user_r,
@@ -43,34 +39,37 @@ fn main() {
     for &user in &users {
         println!("User {}: {:?}", &user.user, &user);
     }
-
     // STEP 1: Value Proposal
-    let vt = BA1(2, users);
+    let vt = algorand_agreement(2, users, String::from("i"));
     // println!("v: {}\tsig: {}", v, sig);
 }
 
 
 
 
-fn BA1<'a>(p: u32, users: Vec<&SIG>) -> (Vote, u32) {
+fn algorand_agreement<'a>(p: u32, users: Vec<&SIG>, user_id: String) -> (Vote, String) {
     //! Byzantine Agreement Protocol
+    let user = users.iter().filter(|&user| *user.user == user_id).take(1);
 
     let votes: Vec<&Vote> = users.iter().map(|&user: &&SIG| &user.vote).collect();
-    let voteCounter = vote_counter(votes);
-    println!("\nVoteCounter: {:?}\n", voteCounter);
-    let majority_vote = majority_vote(voteCounter);
+
+    let voteCounter = vote_counter(&votes);
+
+    let (majority_vote, majority_vote_count) = majority_vote(&voteCounter);
+
+    println!("USER: {:?}\nVoteCounter: {:?}\n", user, voteCounter);
 
     // STEP 1: [Value Proposal]
     if majority_votes_next_null(p, &users) {
-        println!("\nMajority voted: {:?} {:?} times ", majority_vote.0, majority_vote.1);
+        println!("\nMajority voted: {:?} {:?} times, propagating {:?}",
+                 majority_vote, majority_vote_count, user_id);
         // then i proposes vi, which he propagates together with his period p credential;
-        return majority_vote
+        return (majority_vote, "asdf".to_string())
     } else {
-        println!("\nMajority voted: {:?} {:?} times ", majority_vote.0, majority_vote.1);
+        println!("\nMajority voted: {:?} {:?} times", majority_vote, majority_vote_count);
         // then i proposes v, which he propagates together with his period p credential.
-        return majority_vote
+        return (majority_vote, "asdf".to_string())
     }
-
 }
 
 
@@ -95,17 +94,20 @@ fn majority_votes_next_null(p: u32, users: &Vec<&SIG>) -> bool {
     match (p, next_null_vote_count) {
         (1, _) => true,
         (_, nnvc) => {
-            if nnvc > 2*t {
-                println!("\nOver 2*t nodes voted NEXT:");
+            if nnvc > 2*t+1 {
+                println!("\nOver 2*t+1 nodes voted NEXT:");
                 println!("next_null_vote_count: {:?}\t t: {:?}", next_null_vote_count, t);
                 true
-            } else { false }
-        },
+            } else {
+                false
+            }
+        }
     }
 }
 
 
-fn vote_counter<'a>(votes: Vec<&Vote>) -> HashMap<Vote, u32> {
+
+fn vote_counter(votes: &Vec<&Vote>) -> HashMap<Vote, u32> {
     //! Creates a Hashmap of votes, and their counts
     let mut counter: HashMap<Vote, u32> = HashMap::new();
     use Vote::*;
@@ -120,31 +122,39 @@ fn vote_counter<'a>(votes: Vec<&Vote>) -> HashMap<Vote, u32> {
 }
 
 
-
-fn maxHashMap<K, V>(hash_map: HashMap<K, V>) -> (K, V)
-where K: Hash + Eq + Debug + Default, V: Ord + Debug + Default {
+fn majority_vote(voteCounter: &HashMap<Vote, u32>) -> (Vote, u32) {
+    //! DESCRIPTION:
+    //!     Check if user i received 2t + 1 next-votes for ⊥ (NullVote) in period p - 1
+    //!     count number of NullVotes, return majority: v or NullVote
     //! DESCRIPTION: Return the (Key, Value) pair with the largest value in the hash_map
-    let mut maxKey: K = K::default();
-    let mut maxVal: V = V::default();
-    for (key, value) in hash_map {
-        if value > maxVal {
-            maxKey = key;
-            maxVal = value;
+    let mut maxKey = Vote::NullVote;
+    let mut maxVal = 0;
+    for (key, value) in voteCounter {
+        if value > &maxVal {
+            maxKey = *key;
+            maxVal = *value;
         }
     }
     (maxKey, maxVal)
 }
-fn majority_vote(voteCounts: HashMap<Vote, u32>) -> (Vote, u32) {
-    //! DESCRIPTION:
-    //!     Check if user i received 2t + 1 next-votes for ⊥ (NullVote) in period p - 1
-    //!     count number of NullVotes, return majority: v or NullVote
-    let (maxVoteKey, maxVoteVal) = maxHashMap(voteCounts);
-    // let totalVotes  = voteCounts.iter().map(|(k, &v)| v).fold(0, |acc, i| acc+i);
-    // let countValue = votes.iter().filter(|&n| *n != &Vote::NullVote).count() as i32;
-    // let countNull = votes.iter().filter(|&n| *n == &Vote::NullVote).count() as i32;
-    (maxVoteKey, maxVoteVal)
-}
 
 
 
+// fn maxHashMap<K, V>(hash_map: HashMap<K, V>) -> (HashMap<K, V>, K, V)
+// where K: Hash + Eq + Debug + Default, V: Ord + Debug + Default {
+//     //! DESCRIPTION: Return the (Key, Value) pair with the largest value in the hash_map
+//     let mut maxKey: K = K::default();
+//     let mut maxVal: V = V::default();
+//     for (key, value) in hash_map {
+//         if value > maxVal {
+//             maxKey = key;
+//             maxVal = value;
+//         }
+//     }
+//     let totalVotes  = voteCounts.iter().map(|(k, &v)| v).fold(0, |acc, i| acc+i);
+//     let countValue = votes.iter().filter(|&n| *n != &Vote::NullVote).count() as i32;
+//     let countNull = votes.iter().filter(|&n| *n == &Vote::NullVote).count() as i32;
+//     // Ideally avoid taking ownership, just borrow
+//     (hash_map, maxKey, maxVal)
+// }
 
