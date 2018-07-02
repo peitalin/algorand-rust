@@ -25,39 +25,35 @@ fn main() {
     };
     let user_j = SIG::new(&"j", Vote::Value(33), MessageType::SOFT);
     let user_k = SIG::new(&"k", Vote::Value(33), MessageType::CERT);
-    let user_l = SIG::new(&"l", Vote::Value(33), MessageType::NEXT);
+    let user_l = SIG::new(&"l", Vote::Value(33), MessageType::CERT);
     let user_m = SIG::new(&"m", Vote::Value(33), MessageType::NEXT);
     let user_n = SIG::new(&"n", Vote::Value(44), MessageType::NEXT);
     let user_o = SIG::new(&"o", Vote::NullVote,  MessageType::NEXT);
     let user_p = SIG::new(&"p", Vote::NullVote,  MessageType::NEXT);
     let user_q = SIG::new(&"q", Vote::NullVote,  MessageType::NEXT);
     let user_r = SIG::new(&"r", Vote::NullVote,  MessageType::NEXT);
+    let user_s = SIG::new(&"s", Vote::NullVote,  MessageType::NEXT);
     let users = vec![
-        user_i, user_j, user_k, user_l, user_m,
-        user_n, user_o, user_p, user_q, user_r,
+        user_j, user_k, user_l, user_m, user_n,
+        user_o, user_p, user_q, user_r, user_s,
     ];
     for user in &users {
         println!("User {}: {:?}", &user.user, &user);
     }
     // STEP 1: Value Proposal
-    let (propagated_vote, user_signature) = algorand_agreement(2, users, String::from("i"));
-    println!("Propagated Vote: {:?}\tSignature: {}", propagated_vote, user_signature);
+    let user_sig = algorand_agreement(2, users, user_i);
+    println!("Propagated Vote: {:?}\tSignature: {}", &user_sig.vote, &user_sig.signature);
 }
 
 
 
 
-fn algorand_agreement<'a>(p: u32, users: Vec<SIG>, user_id: String) -> (Vote, String) {
+fn algorand_agreement<'a>(p: u32, users: Vec<SIG>, user: SIG<'a>) -> SIG<'a> {
     //! Byzantine Agreement Protocol
     //!     Params:
     //!         p: period
     //!         users: vector of other users's SIG messages (user, vote, message, signature)
     //!         user_id: user's id
-    // let user: Vec<&SIG> = users.iter().filter(|user| user.user == user_id).collect();
-    let user = users.iter()
-        .filter(|user| user.user == user_id)
-        .collect::<Vec<&SIG>>()[0];
-
     let votes: Vec<Vote> = users.iter().map(|sig| sig.vote).collect();
 
     let voteCounter = vote_counter(&votes);
@@ -68,14 +64,14 @@ fn algorand_agreement<'a>(p: u32, users: Vec<SIG>, user_id: String) -> (Vote, St
 
     // STEP 1: [Value Proposal]
     if majority_votes_next_null(p, &users) {
-        println!("\nMajority voted: {:?} {:?} times, user {} propagates: {:?}",
-                 majority_vote, majority_vote_count, &user_id, &user.vote);
+        println!("\nMajority voted: {:?} {:?} times, user propagates: {:?}",
+                 majority_vote, majority_vote_count, &user.vote);
         // then i proposes vi, which he propagates together with his period p credential;
-        return (user.vote, user.signature.clone())
+        return user
     } else {
         println!("\nMajority voted: {:?} {:?} times", majority_vote, majority_vote_count);
         // then i proposes v, which he propagates together with his period p credential.
-        return (majority_vote, user.signature.clone())
+        return user
     }
 }
 
