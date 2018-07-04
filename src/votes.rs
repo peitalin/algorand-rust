@@ -95,11 +95,3 @@ impl<'a> Sig<'a> {
     }
 }
 
-
-
-
-#[derive(Debug, PartialEq)]
-pub enum SigError {
-    MessageTypeError,
-}
-
