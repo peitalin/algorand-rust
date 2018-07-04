@@ -8,7 +8,7 @@ use ring::digest::{ digest, SHA256, Digest };
 
 #[derive(Debug, Clone, Copy, Eq)]
 pub enum Vote {
-    Value(i32),
+    Value(u32),
     NullVote,
 }
 impl Default for Vote {
@@ -42,24 +42,34 @@ pub fn signature(input: &str) -> String {
     result.as_ref().iter().map(|b| format!("{:x}", b)).collect()
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MessageType {
     CERT,
     SOFT,
     NEXT,
 }
+impl Hash for MessageType {
+    fn hash<H: Hasher>(&self, _state: &mut H) {
+        let mut hasher = DefaultHasher::new();
+        match &self {
+            MessageType::CERT => Hash::hash_slice(b"MessageType::CERT", &mut hasher),
+            MessageType::SOFT => Hash::hash_slice(b"MessageType::SOFT", &mut hasher),
+            MessageType::NEXT => Hash::hash_slice(b"MessageType::NEXT", &mut hasher),
+        }
+    }
+}
 
 
-#[derive(Debug)]
-pub struct SIG<'a> {
+#[derive(Debug, PartialEq, Hash, Eq)]
+pub struct Sig<'a> {
     pub user: &'a str,
     pub vote: Vote,
     pub message: MessageType,
     pub signature: String,
 }
-impl<'a> SIG<'a> {
-    pub fn new(i: &'a str, v: Vote, x: MessageType) -> SIG<'a> {
-        SIG {
+impl<'a> Sig<'a> {
+    pub fn new(i: &'a str, v: Vote, x: MessageType) -> Sig<'a> {
+        Sig {
             user: i, // user i
             vote: v, // vote value
             message: x, // message
@@ -68,7 +78,11 @@ impl<'a> SIG<'a> {
     }
 
     pub fn update_vote(&mut self, v: Vote) {
-        self.vote = v;
+        self.vote = v.clone();
+    }
+
+    pub fn update_message_type(&mut self, message: MessageType) {
+        self.message = message.clone();
     }
 
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -82,4 +96,10 @@ impl<'a> SIG<'a> {
 }
 
 
+
+
+#[derive(Debug, PartialEq)]
+pub enum SigError {
+    MessageTypeError,
+}
 
