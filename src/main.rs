@@ -64,6 +64,7 @@ fn main() {
 fn algorand_agreement<'a>(p: u32, users: Vec<Sig>, mut user_i: Sig<'a>) {
     //! DESCRIPTION:
     //!     Algorand's Byzantine Agreement Protocol
+    //!     Page 4: Jing Chen, Sergey Gorbunov, Silvio Micali, Georgios Vlachos (2018)
     //! PARAMS:
     //!     p: period
     //!     users: vector of other users's Sig messages (user, vote, message, signature)
@@ -73,17 +74,21 @@ fn algorand_agreement<'a>(p: u32, users: Vec<Sig>, mut user_i: Sig<'a>) {
     let vote_message_counts: HashMap<MessageType, HashMap<Vote, u32>> = vote_message_counter(&users);
 
     let (majority_message, majority_vote, majority_message_vote_count) = calc_majority_vote(&vote_message_counts);
-    println!("\nMajority message: {:?}\nMajority vote: {:?}\nCount: {:?}",
+    println!("\nMajority Vote Observed:\n\tMajority message: {:?}\n\tMajority vote: {:?}\n\tCount: {:?}",
              majority_message, majority_vote, majority_message_vote_count);
 
-    // Page 4: Jing Chen, Sergey Gorbunov, Silvio Micali, Georgios Vlachos (2018)
     let t = 1; // Number of malicious nodes
+    // How do you know how many malicious nodes there are?
+
+    if halting_condition(t, &majority_message, &majority_vote, &majority_message_vote_count) {
+        return
+    } else {
+        println!("No halting condition (majority CERT-vote) encountered, resuming consensus protocol.");
+    }
 
     // STEP 1: [Value Proposal]
     println!("\n[STEP 1: Value Proposal]");
-    // Define a dictionary lookup macro
     println!("\tUser original Vote: {:?}", &user_i);
-
     if (p == 1) || (majority_message == MessageType::NEXT
                     && majority_vote == Vote::NullVote
                     && majority_message_vote_count >= 2*t+1) {
@@ -246,4 +251,17 @@ where K: Hash + Eq + Debug + Default, V: Ord + Debug + Default {
     (maxKey, maxVal)
 }
 
+
+
+fn halting_condition(t: u32, majority_message: &MessageType, majority_vote: &Vote, majority_message_vote_count: &u32) -> bool {
+    // User i HALTS the moment he sees 2t + 1 cert-votes for some value v for the same period p,
+    // and sets v to be his output. Those cert-votes form a certificate for v.
+    if *majority_message == MessageType::CERT
+        && *majority_message_vote_count >= 2*t+1 && *majority_vote != Vote::NullVote {
+        println!("User sees 2t + 1 CERT-votes for some value v");
+        true
+    } else {
+        false
+    }
+}
 
