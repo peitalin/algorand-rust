@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 #![allow(unused_imports)]
+#![allow(unused_mut)]
 
 extern crate ring;
 extern crate serde_json;
@@ -16,13 +17,13 @@ use std::fmt::Debug;
 use serde_json::{ Value, Error };
 
 
-fn main() {
-    let user_i = Sig {
-        user: &String::from("i"),
-        vote: Vote::Value(22),
-        message: MessageType::NEXT,
-        signature: signature(&String::from("idasdf"))
-    };
+fn gossip<'a>() -> Vec<Sig<'a>> {
+    // let user_i = Sig {
+    //     user: &String::from("i"),
+    //     vote: Vote::Value(22),
+    //     message: MessageType::NEXT,
+    //     signature: signature(&String::from("idasdf"))
+    // };
     // // NEXT demo
     // let user_j = Sig::new(&"j", Vote::Value(33), MessageType::NEXT);
     // let user_k = Sig::new(&"k", Vote::Value(33), MessageType::NEXT);
@@ -35,6 +36,7 @@ fn main() {
     // let user_r = Sig::new(&"r", Vote::NullVote,  MessageType::NEXT);
     // let user_s = Sig::new(&"s", Vote::NullVote,  MessageType::NEXT);
     // SOFT demo
+    let user_i = Sig::new(&"i", Vote::Value(22), MessageType::SOFT);
     let user_j = Sig::new(&"j", Vote::Value(33), MessageType::SOFT);
     let user_k = Sig::new(&"k", Vote::Value(33), MessageType::SOFT);
     let user_l = Sig::new(&"l", Vote::Value(33), MessageType::SOFT);
@@ -45,23 +47,43 @@ fn main() {
     let user_q = Sig::new(&"q", Vote::NullVote,  MessageType::SOFT);
     let user_r = Sig::new(&"r", Vote::NullVote,  MessageType::NEXT);
     let user_s = Sig::new(&"s", Vote::NullVote,  MessageType::NEXT);
-    let users = vec![
-        user_j, user_k, user_l, user_m, user_n,
+    let users: Vec<Sig> = vec![
+        user_i, user_j, user_k, user_l, user_m, user_n,
         user_o, user_p, user_q, user_r, user_s,
     ];
-    for user in &users {
-        println!("User {}: {:?}", &user.user, &user);
-    }
-    // STEP 1: Value Proposal
+    users
+}
+
+
+fn main() {
+    let mut users: Vec<Sig> = gossip();
+    // mutable vector: each Sig mutates
+    let mut users_iter: Vec<Sig> = gossip();
+    // Purely for iteration only.
+    // Can't mutate vector which you are iterating over
+
+    // Begin Algorand Rounds
     let p = 2;
-    let user_sig = algorand_agreement(p, users, user_i);
-    println!("\nPropagated Vote: {:?}", &user_sig);
+    for (i, user_i) in users_iter.into_iter().enumerate() {
+        println!("===================BEGIN ROUND - USER: {:?}======================", &user_i.user);
+        let (halt, new_user) = algorand_agreement(&p, &users, user_i);
+        let replace_user = users.remove(0);
+        if replace_user != new_user {
+            println!("\n\n\t=======REPLACED USER: {:?}", replace_user);
+            println!("\t========WITH USER: {:?}", new_user);
+        }
+        users.push(new_user);
+        println!("\n========================END ROUND===========================\n");
+    }
+    // let (halt, user_i) = algorand_agreement(&p, &users, user_i);
+    // println!("\nHalting Condition: {:?}\n\tUser_i votes: {:?}", &halt, &user_i);
+
 }
 
 
 
 
-fn algorand_agreement<'a>(p: u32, users: Vec<Sig>, mut user_i: Sig<'a>) {
+fn algorand_agreement<'a>(p: &u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bool, Sig<'a>) {
     //! DESCRIPTION:
     //!     Algorand's Byzantine Agreement Protocol
     //!     Page 4: Jing Chen, Sergey Gorbunov, Silvio Micali, Georgios Vlachos (2018)
@@ -69,7 +91,6 @@ fn algorand_agreement<'a>(p: u32, users: Vec<Sig>, mut user_i: Sig<'a>) {
     //!     p: period
     //!     users: vector of other users's Sig messages (user, vote, message, signature)
     //!     user_i: user's Sig
-    let votes: Vec<Vote> = users.iter().map(|sig| sig.vote).collect();
 
     let vote_message_counts: HashMap<MessageType, HashMap<Vote, u32>> = vote_message_counter(&users);
 
@@ -81,7 +102,7 @@ fn algorand_agreement<'a>(p: u32, users: Vec<Sig>, mut user_i: Sig<'a>) {
     // How do you know how many malicious nodes there are?
 
     if halting_condition(t, &majority_message, &majority_vote, &majority_message_vote_count) {
-        return
+        return (true, user_i)
     } else {
         println!("No halting condition (majority CERT-vote) encountered, resuming consensus protocol.");
     }
@@ -89,15 +110,15 @@ fn algorand_agreement<'a>(p: u32, users: Vec<Sig>, mut user_i: Sig<'a>) {
     // STEP 1: [Value Proposal]
     println!("\n[STEP 1: Value Proposal]");
     println!("\tUser original Vote: {:?}", &user_i);
-    if (p == 1) || (majority_message == MessageType::NEXT
+    if (*p == 1) || (majority_message == MessageType::NEXT
                     && majority_vote == Vote::NullVote
                     && majority_message_vote_count >= 2*t+1) {
         // If p=1 or (p >= 2 AND i has received 2t+1 next-votes for ⊥ NullVote in period p-1)
         // then i proposes vi, which he propagates together with his period p credential;
-        if p == 1 { println!("\nPeriod: 1") }
+        if *p == 1 { println!("\nPeriod: 1") }
         /// CODE: network broadcast
         println!("\tUser broadcasts (1a): {:?}", &user_i);
-    } else if (p >= 2) && majority_message == MessageType::NEXT
+    } else if (*p >= 2) && majority_message == MessageType::NEXT
                         && majority_vote != Vote::NullVote
                         && majority_message_vote_count >= 2*t+1 {
         // Else if 􏰀p ≥ 2􏰁 AND 􏰀i has received 2t + 1 next-votes for some value v ̸= ⊥ for period p−1􏰁
@@ -111,7 +132,7 @@ fn algorand_agreement<'a>(p: u32, users: Vec<Sig>, mut user_i: Sig<'a>) {
 
     // STEP 2: [Filtering Step]
     println!("\n[STEP 2: Filtering Step]");
-    if (p == 1) || (majority_message == MessageType::NEXT
+    if (*p == 1) || (majority_message == MessageType::NEXT
                     && majority_vote == Vote::NullVote
                     && majority_message_vote_count >= 2*t+1) {
         // If p=1 or (p >= 2 AND i has received 2t+1 next-votes for ⊥ NullVote in period p-1)
@@ -171,6 +192,8 @@ fn algorand_agreement<'a>(p: u32, users: Vec<Sig>, mut user_i: Sig<'a>) {
         println!("\tUser NEXT-votes (4): {:?}", &user_i.vote);
     }
 
+    // Return (Halting condition, User_sig)
+    return (false, user_i)
 }
 
 

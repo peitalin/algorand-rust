@@ -60,7 +60,7 @@ impl Hash for MessageType {
 }
 
 
-#[derive(Debug, PartialEq, Hash, Eq)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct Sig<'a> {
     pub user: &'a str,
     pub vote: Vote,
