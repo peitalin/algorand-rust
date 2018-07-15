@@ -5,54 +5,19 @@
 
 extern crate ring;
 extern crate serde_json;
+use serde_json::{ Value, Error };
+use std::collections::HashMap;
 
 mod votes;
-use votes::Vote;
-use votes::MessageType;
-use votes::{ signature, Sig };
+use votes::{
+    Vote,
+    MessageType,
+    signature,
+    Sig,
+    gossip
+};
 
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::fmt::Debug;
-use serde_json::{ Value, Error };
 
-
-fn gossip<'a>() -> Vec<Sig<'a>> {
-    // let user_i = Sig {
-    //     user: &String::from("i"),
-    //     vote: Vote::Value(22),
-    //     message: MessageType::NEXT,
-    //     signature: signature(&String::from("idasdf"))
-    // };
-    // // NEXT demo
-    // let user_j = Sig::new(&"j", Vote::Value(33), MessageType::NEXT);
-    // let user_k = Sig::new(&"k", Vote::Value(33), MessageType::NEXT);
-    // let user_l = Sig::new(&"l", Vote::Value(33), MessageType::NEXT);
-    // let user_m = Sig::new(&"m", Vote::Value(33), MessageType::NEXT);
-    // let user_n = Sig::new(&"n", Vote::Value(33), MessageType::SOFT);
-    // let user_o = Sig::new(&"o", Vote::Value(33), MessageType::SOFT);
-    // let user_p = Sig::new(&"p", Vote::NullVote,  MessageType::NEXT);
-    // let user_q = Sig::new(&"q", Vote::NullVote,  MessageType::NEXT);
-    // let user_r = Sig::new(&"r", Vote::NullVote,  MessageType::NEXT);
-    // let user_s = Sig::new(&"s", Vote::NullVote,  MessageType::NEXT);
-    // SOFT demo
-    let user_i = Sig::new(&"i", Vote::Value(22), MessageType::SOFT);
-    let user_j = Sig::new(&"j", Vote::Value(33), MessageType::SOFT);
-    let user_k = Sig::new(&"k", Vote::Value(33), MessageType::SOFT);
-    let user_l = Sig::new(&"l", Vote::Value(33), MessageType::SOFT);
-    let user_m = Sig::new(&"m", Vote::Value(33), MessageType::SOFT);
-    let user_n = Sig::new(&"n", Vote::Value(33), MessageType::SOFT);
-    let user_o = Sig::new(&"o", Vote::Value(33), MessageType::SOFT);
-    let user_p = Sig::new(&"p", Vote::NullVote,  MessageType::SOFT);
-    let user_q = Sig::new(&"q", Vote::NullVote,  MessageType::SOFT);
-    let user_r = Sig::new(&"r", Vote::NullVote,  MessageType::NEXT);
-    let user_s = Sig::new(&"s", Vote::NullVote,  MessageType::NEXT);
-    let users: Vec<Sig> = vec![
-        user_i, user_j, user_k, user_l, user_m, user_n,
-        user_o, user_p, user_q, user_r, user_s,
-    ];
-    users
-}
 
 
 fn main() {
@@ -64,8 +29,8 @@ fn main() {
 
     // Begin Algorand Rounds
     let p = 2;
-    for (i, user_i) in users_iter.into_iter().enumerate() {
-        println!("===================BEGIN ROUND - USER: {:?}======================", &user_i.user);
+    for (i, user_i) in users_iter.clone().into_iter().enumerate() {
+        println!("==================BEGIN ROUND - USER: {:?}===================", &user_i.user);
         let (halt, new_user) = algorand_agreement(&p, &users, user_i);
         let replace_user = users.remove(0);
         if replace_user != new_user {
@@ -75,8 +40,9 @@ fn main() {
         users.push(new_user);
         println!("\n========================END ROUND===========================\n");
     }
-    // let (halt, user_i) = algorand_agreement(&p, &users, user_i);
-    // println!("\nHalting Condition: {:?}\n\tUser_i votes: {:?}", &halt, &user_i);
+
+    // println!("\n\nInitial Sigs: {:?}", users_iter.iter().map(|x| (x.vote, x.message)));
+    println!("End round Sigs: {:?}", users.into_iter().map(|x| (x.vote, x.message)));
 
 }
 
@@ -253,28 +219,6 @@ fn calc_majority_vote<'a>(vote_message_counter: &HashMap<MessageType, HashMap<Vo
 }
 
 
-fn maxHashMap<K, V>(hash_map: HashMap<K, V>) -> (K, V)
-where K: Hash + Eq + Debug + Default, V: Ord + Debug + Default {
-    //! DESCRIPTION:
-    //!     Return the (Key, Value) pair of the entry with the largest value in the hash_map
-    //! PARAMS:
-    //!     hash_map: Generic HashMap
-    let mut maxKey: K = K::default();
-    let mut maxVal: V = V::default();
-    for (key, value) in hash_map {
-        if value > maxVal {
-            maxKey = key;
-            maxVal = value;
-        }
-    }
-    // let totalVotes  = voteCounts.iter().map(|(k, &v)| v).fold(0, |acc, i| acc+i);
-    // let countValue = votes.iter().filter(|&n| *n != &Vote::NullVote).count() as i32;
-    // let countNull = votes.iter().filter(|&n| *n == &Vote::NullVote).count() as i32;
-    // Ideally avoid taking ownership, just borrow
-    (maxKey, maxVal)
-}
-
-
 
 fn halting_condition(t: u32, majority_message: &MessageType, majority_vote: &Vote, majority_message_vote_count: &u32) -> bool {
     // User i HALTS the moment he sees 2t + 1 cert-votes for some value v for the same period p,
@@ -287,4 +231,5 @@ fn halting_condition(t: u32, majority_message: &MessageType, majority_vote: &Vot
         false
     }
 }
+
 
