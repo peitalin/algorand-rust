@@ -19,27 +19,34 @@ use votes::{
     // functions
     signature,
     gossip,
-    calc_majority_vote,
-    vote_message_counter_hashmap,
+};
+
+mod config;
+use config::{
+    Config,
+    get_config,
 };
 
 
 
 fn main() {
-    // let mut users: Vec<Sig> = gossip(String::from("nullvote"));
-    // let users_iter: Vec<Sig> = gossip(String::from("nullvote"));
 
-    let mut users: Vec<Sig> = gossip(String::from("value"));
-    let users_iter: Vec<Sig> = gossip(String::from("value"));
+    let args: Vec<String> = std::env::args().collect();
+    let config = Config::new(&args).unwrap_or_else(|err| {
+        println!("Please supply an argument: 'values' or 'nullvotes'.");
+        std::process::exit(1);
+    });
+    let mut users: Vec<Sig> = gossip(&config.gossip_type);
+    let users_iter: Vec<Sig> = gossip(&config.gossip_type);
 
-    // mut users: mutalbe vector: each sig mutates
+    // mut users: mutable vector: each sig mutates
     // user_iter is purely for iteration only.
     // Can't mutate vector which you are iterating over
 
     // Begin Algorand Rounds
     let mut p = 1;
     let mut halt = false;
-    let mut user_hald = false;
+    let mut user_halt = false;
     let mut cert_count = 0;
 
     while !halt && p < 10 {

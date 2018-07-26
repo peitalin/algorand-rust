@@ -52,7 +52,7 @@ impl<'a> Sig<'a> {
     }
 }
 
-pub fn gossip<'a>(gossip_type: String) -> Vec<Sig<'a>> {
+pub fn gossip<'a>(gossip_type: &String) -> Vec<Sig<'a>> {
 
     let user_a = Sig::new(&"a", Vote::Value(11), MessageType::SOFT);
     let user_b = Sig::new(&"b", Vote::Value(11), MessageType::SOFT);
@@ -97,7 +97,7 @@ pub fn gossip<'a>(gossip_type: String) -> Vec<Sig<'a>> {
     let user_y = Sig::new(&"y", Vote::NullVote, MessageType::NEXT);
     let user_z = Sig::new(&"z", Vote::NullVote, MessageType::NEXT);
 
-    if gossip_type == "value" {
+    if *gossip_type == "values" {
         let users: Vec<Sig> = vec![
             user_a, user_b, user_c, user_d, user_e, user_f, user_g, user_h, user_i,
             user_j, user_k, user_l, user_m, user_n, user_o, user_p,
@@ -118,60 +118,6 @@ pub fn gossip<'a>(gossip_type: String) -> Vec<Sig<'a>> {
 
 
 
-pub fn calc_majority_vote<'a>(vote_message_counter: &HashMap<MessageType, HashMap<Vote, u32>>) -> (MessageType, Vote, u32) {
-    //! DESCRIPTION:
-    //!     Check if user i received 2t + 1 next-votes for ⊥ (NullVote) in period p - 1
-    //!     count number of NullVotes, return majority: v or NullVote
-    //! PARAMS:
-    //!     vote_message_counter: reference to a HashMap of a HashMap: MessageType[Vote]
-    //! RETURN: Returns the (Key, Value) pair with the largest value in the hash_map
-    let mut maxMsg = &MessageType::SOFT;
-    let mut maxVote = &Vote::NullVote;
-    let mut maxVal = 0;
-    for (message_type, vote_dict) in vote_message_counter {
-        for (voteKey, val) in vote_dict {
-            if val > &maxVal {
-                maxMsg = message_type;
-                maxVote = voteKey;
-                maxVal = *val
-            }
-        }
-    }
-    (maxMsg.clone(), maxVote.clone(), maxVal)
-}
-
-
-pub fn vote_message_counter_hashmap<'a>(users: &Vec<Sig>) -> HashMap<MessageType, HashMap<Vote, u32>> {
-    //! DESCRIPTION:
-    //!     Creates a HashMap of MessageType[Vote], and respective counts
-    //! PARAMS:
-    //!     users: vector of peer votes (Sig) from previous period p-1
-    let mut messageDict: HashMap<MessageType, HashMap<Vote, u32>> = HashMap::new();
-    let mut voteDictSOFT: HashMap<Vote, u32> = HashMap::new();
-    let mut voteDictCERT: HashMap<Vote, u32> = HashMap::new();
-    let mut voteDictNEXT: HashMap<Vote, u32> = HashMap::new();
-    // HashMap::new() returns address, need to deference to mutate
-    use MessageType::{ SOFT, CERT, NEXT };
-    use Vote::{ Value, NullVote };
-    for u in users {
-        // iterate and count votes for each value.
-        match (&u.message, &u.vote ) {
-            (SOFT, Vote::Value(n)) => *voteDictSOFT.entry(Vote::Value(*n)).or_insert(0) += 1,
-            (CERT, Vote::Value(n)) => *voteDictCERT.entry(Vote::Value(*n)).or_insert(0) += 1,
-            (NEXT, Vote::Value(n)) => *voteDictNEXT.entry(Vote::Value(*n)).or_insert(0) += 1,
-            (SOFT, Vote::NullVote) => *voteDictSOFT.entry(NullVote).or_insert(0) += 1,
-            (CERT, Vote::NullVote) => *voteDictCERT.entry(NullVote).or_insert(0) += 1,
-            (NEXT, Vote::NullVote) => *voteDictNEXT.entry(NullVote).or_insert(0) += 1,
-        }
-    }
-    messageDict.insert(SOFT, voteDictSOFT);
-    messageDict.insert(CERT, voteDictCERT);
-    messageDict.insert(NEXT, voteDictNEXT);
-    messageDict
-}
-
-
-
 pub struct MajorityVote {
     pub message: MessageType,
     pub vote: Vote,
@@ -179,12 +125,63 @@ pub struct MajorityVote {
 }
 impl MajorityVote {
     pub fn new(users: &Vec<Sig>) -> MajorityVote {
-        let vote_message_counts: HashMap<MessageType, HashMap<Vote, u32>> = vote_message_counter_hashmap(&users);
-        let (majority_message, majority_vote, majority_count) = calc_majority_vote(&vote_message_counts);
+        let vote_message_dict: HashMap<MessageType, HashMap<Vote, u32>> = MajorityVote::vote_message_counter_hashmap(&users);
+        let (majority_message, majority_vote, majority_count) = MajorityVote::calc_majority_vote(&vote_message_dict);
         MajorityVote {
             message: majority_message,
             vote: majority_vote,
             count: majority_count,
         }
+    }
+
+    fn vote_message_counter_hashmap<'a>(users: &Vec<Sig>) -> HashMap<MessageType, HashMap<Vote, u32>> {
+        //! DESCRIPTION:
+        //!     Creates a HashMap of MessageType[Vote], and respective counts
+        //! PARAMS:
+        //!     users: vector of peer votes (Sig) from previous period p-1
+        let mut messageDict: HashMap<MessageType, HashMap<Vote, u32>> = HashMap::new();
+        let mut voteDictSOFT: HashMap<Vote, u32> = HashMap::new();
+        let mut voteDictCERT: HashMap<Vote, u32> = HashMap::new();
+        let mut voteDictNEXT: HashMap<Vote, u32> = HashMap::new();
+        // HashMap::new() returns address, need to deference to mutate
+        use MessageType::{ SOFT, CERT, NEXT };
+        use Vote::{ Value, NullVote };
+        for u in users {
+            // iterate and count votes for each value.
+            match (&u.message, &u.vote ) {
+                (SOFT, Vote::Value(n)) => *voteDictSOFT.entry(Vote::Value(*n)).or_insert(0) += 1,
+                (CERT, Vote::Value(n)) => *voteDictCERT.entry(Vote::Value(*n)).or_insert(0) += 1,
+                (NEXT, Vote::Value(n)) => *voteDictNEXT.entry(Vote::Value(*n)).or_insert(0) += 1,
+                (SOFT, Vote::NullVote) => *voteDictSOFT.entry(NullVote).or_insert(0) += 1,
+                (CERT, Vote::NullVote) => *voteDictCERT.entry(NullVote).or_insert(0) += 1,
+                (NEXT, Vote::NullVote) => *voteDictNEXT.entry(NullVote).or_insert(0) += 1,
+            }
+        }
+        messageDict.insert(SOFT, voteDictSOFT);
+        messageDict.insert(CERT, voteDictCERT);
+        messageDict.insert(NEXT, voteDictNEXT);
+        messageDict
+    }
+
+    fn calc_majority_vote<'a>(vote_message_counter: &HashMap<MessageType, HashMap<Vote, u32>>) -> (MessageType, Vote, u32) {
+        //! DESCRIPTION:
+        //!     Check if user i received 2t + 1 next-votes for ⊥ (NullVote) in period p - 1
+        //!     count number of NullVotes, return majority: v or NullVote
+        //! PARAMS:
+        //!     vote_message_counter: reference to a HashMap of a HashMap: MessageType[Vote]
+        //! RETURN: Returns the (Key, Value) pair with the largest value in the hash_map
+        let mut maxMsg = &MessageType::SOFT;
+        let mut maxVote = &Vote::NullVote;
+        let mut maxVal = 0;
+        for (message_type, vote_dict) in vote_message_counter {
+            for (voteKey, val) in vote_dict {
+                if val > &maxVal {
+                    maxMsg = message_type;
+                    maxVote = voteKey;
+                    maxVal = *val
+                }
+            }
+        }
+        (maxMsg.clone(), maxVote.clone(), maxVal)
     }
 }
