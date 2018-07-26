@@ -12,7 +12,7 @@ pub fn get_config() -> Config {
 }
 
 pub struct Config {
-    pub gossip_type: String
+    pub gossip_type: String,
 }
 impl Config {
     pub fn new(args: &[String]) -> Result<Config, &'static str> {
@@ -20,7 +20,6 @@ impl Config {
             return Err("Not enough arguments supplied.")
         }
         let gossip_type = args[1].clone();
-        // match &gossip_type as &str {
         match gossip_type.as_ref() {
             "values" | "nullvotes" => Ok(Config { gossip_type }),
             _ => Err("Argument must be 'values' or 'nullvotes'"),
@@ -29,4 +28,5 @@ impl Config {
         // match &gossip_type as &str
         // match gossip_type.as_ref()
     }
+
 }

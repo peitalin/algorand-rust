@@ -38,13 +38,13 @@ fn main() {
     });
     let mut users: Vec<Sig> = gossip(&config.gossip_type);
     let users_iter: Vec<Sig> = gossip(&config.gossip_type);
-
     // mut users: mutable vector: each sig mutates
     // user_iter is purely for iteration only.
     // Can't mutate vector which you are iterating over
 
     // Begin Algorand Rounds
     let mut p = 1;
+    let mut t = 1;
     let mut halt = false;
     let mut user_halt = false;
     let mut cert_count = 0;
@@ -54,7 +54,7 @@ fn main() {
         cert_count = 0;
         for (i, user_i) in users_iter.clone().into_iter().enumerate() {
             println!("\n------ USER: {:?} ------", &user_i.user);
-            let (user_halt, new_user) = algorand_agreement(p, &users, user_i);
+            let (user_halt, new_user) = algorand_agreement(p, t, &users, user_i);
             if user_halt {
                 cert_count = cert_count + 1;
             }
@@ -79,13 +79,13 @@ fn main() {
 
 
 
-
-fn algorand_agreement<'a>(p: u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bool, Sig<'a>) {
+fn algorand_agreement<'a>(p: u32, t: u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bool, Sig<'a>) {
     //! DESCRIPTION:
     //!     Algorand's Byzantine Agreement Protocol
     //!     Page 4: Jing Chen, Sergey Gorbunov, Silvio Micali, Georgios Vlachos (2018)
     //! PARAMS:
     //!     p: period
+    //!     t: number of malicious nodes (How to know how many malicious-nodes exist?)
     //!     users: vector of other users's Sig messages (user, vote, message, signature)
     //!     user_i: user's Sig
 
@@ -95,8 +95,6 @@ fn algorand_agreement<'a>(p: u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (boo
              majority.message, majority.vote, majority.count);
     println!("User:\n\tmessage: {:?}\n\tvote: {:?}", user_i.message, user_i.vote);
 
-    let t = 1; // Number of malicious nodes
-    // How do you know how many malicious nodes there are?
     if p == 1 { println!("\nPeriod: 1") }
     if halting_condition(t, &majority) {
         user_i.update_vote(majority.vote);
