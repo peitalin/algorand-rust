@@ -118,7 +118,7 @@ fn algorand_agreement<'a>(p: u32, t: u32, users: &Vec<Sig>, mut user_i: Sig<'a>)
     } else if (p >= 2) && majority.message == MessageType::NEXT
                         && majority.vote != Vote::NullVote
                         && majority.count >= 2*t+1 {
-        // Else if 􏰀p ≥ 2􏰁 AND 􏰀i has received 2t + 1 next-votes for some value v ̸= ⊥ for period p−1􏰁
+        // Else if p ≥ 2 AND i has received 2t + 1 next-votes for some value v ̸= ⊥ for period p - 1
         //  i proposes v, which he propagates together with his period p credential.
         user_i.update_vote(majority.vote);
         /// CODE: network broadcast
