@@ -36,15 +36,16 @@ fn main() {
         println!("Please supply an argument: 'values' or 'nullvotes'.");
         std::process::exit(1);
     });
+
     let mut users: Vec<Sig> = gossip(&config.gossip_type);
-    let users_iter: Vec<Sig> = gossip(&config.gossip_type);
+    let users_init: Vec<Sig> = users.clone();
     // mut users: mutable vector: each sig mutates
     // user_iter is purely for iteration only.
     // Can't mutate vector which you are iterating over
 
     // Begin Algorand Rounds
     let mut p = 1;
-    let mut t = 1;
+    let mut t = config.num_malnodes;
     let mut halt = false;
     let mut user_halt = false;
     let mut cert_count = 0;
@@ -52,7 +53,7 @@ fn main() {
     while !halt && p < 10 {
         println!("\n================== BEGIN ROUND {} ===================", &p);
         cert_count = 0;
-        for (i, user_i) in users_iter.clone().into_iter().enumerate() {
+        for (i, user_i) in users.clone().into_iter().enumerate() {
             println!("\n------ USER: {:?} ------", &user_i.user);
             let (user_halt, new_user) = algorand_agreement(p, t, &users, user_i);
             if user_halt {
@@ -72,9 +73,10 @@ fn main() {
             halt = true;
         }
         p = p + 1;
-        print_sigs(String::from("Initial Sigs"), &users_iter);
+        print_sigs(String::from("Initial Sigs"), &users_init);
         print_sigs(String::from("Ending Sigs"), &users);
     }
+    println!("Number of Malicious nodes assumed: {:?}", t);
 }
 
 
