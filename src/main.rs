@@ -7,16 +7,21 @@ extern crate ring;
 extern crate serde_json;
 use serde_json::{ Value, Error };
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 mod votes;
 use votes::{
+    // Types
     Vote,
     MessageType,
-    signature,
     Sig,
-    gossip
+    MajorityVote,
+    // functions
+    signature,
+    gossip,
+    calc_majority_vote,
+    vote_message_counter_hashmap,
 };
-
 
 
 
@@ -36,7 +41,6 @@ fn main() {
     let mut halt = false;
     let mut user_hald = false;
     let mut cert_count = 0;
-
 
     while !halt && p < 10 {
         println!("\n================== BEGIN ROUND {} ===================", &p);
@@ -64,16 +68,6 @@ fn main() {
         print_sigs(String::from("Initial Sigs"), &users_iter);
         print_sigs(String::from("Ending Sigs"), &users);
     }
-
-
-}
-
-
-fn print_sigs(period: String, users: &Vec<Sig>) {
-    println!("{}:", period);
-    for user in users.iter() {
-        println!("\tuser: {:?}\tvote: {:?}\tmessage: {:?}", user.user, user.vote, user.message);
-    }
 }
 
 
@@ -88,106 +82,95 @@ fn algorand_agreement<'a>(p: u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (boo
     //!     users: vector of other users's Sig messages (user, vote, message, signature)
     //!     user_i: user's Sig
 
-    let vote_message_counts: HashMap<MessageType, HashMap<Vote, u32>> = vote_message_counter_fn(&users);
+    let majority = MajorityVote::new(&users);
 
-    let (majority_message, majority_vote, majority_message_vote_count) = calc_majority_vote(&vote_message_counts);
     println!("Majority Vote Observed:\n\tMajority message: {:?}\n\tMajority vote: {:?}\n\tCount: {:?}",
-             majority_message, majority_vote, majority_message_vote_count);
+             majority.message, majority.vote, majority.count);
     println!("User:\n\tmessage: {:?}\n\tvote: {:?}", user_i.message, user_i.vote);
 
     let t = 1; // Number of malicious nodes
     // How do you know how many malicious nodes there are?
-
-    if halting_condition(t, &majority_message, &majority_vote, &majority_message_vote_count) {
-        user_i.update_vote(majority_vote);
-        user_i.update_message_type(majority_message);
+    if p == 1 { println!("\nPeriod: 1") }
+    if halting_condition(t, &majority) {
+        user_i.update_vote(majority.vote);
+        user_i.update_message_type(majority.message);
         return (true, user_i)
     } else {
         println!("No halting condition (majority CERT-vote) encountered, resuming consensus protocol.");
     }
-    if p == 1 { println!("\nPeriod: 1") }
+
 
     // STEP 1: [Value Proposal]
-    // println!("\n[STEP 1: Value Proposal]");
-    if (p == 1) || (majority_message == MessageType::NEXT
-                    && majority_vote == Vote::NullVote
-                    && majority_message_vote_count >= 2*t+1) {
+    if (p == 1) || (majority.message == MessageType::NEXT
+                    && majority.vote == Vote::NullVote
+                    && majority.count >= 2*t+1) {
         // If p=1 or (p >= 2 AND i has received 2t+1 next-votes for ⊥ NullVote in period p-1)
         // then i proposes vi, which he propagates together with his period p credential;
         /// CODE: network broadcast
-        println!("\tUser broadcasts (1a): {:?}", &user_i);
-    } else if (p >= 2) && majority_message == MessageType::NEXT
-                        && majority_vote != Vote::NullVote
-                        && majority_message_vote_count >= 2*t+1 {
+        println!("\t[Step 1a] User broadcasts: {:?}", &user_i);
+    } else if (p >= 2) && majority.message == MessageType::NEXT
+                        && majority.vote != Vote::NullVote
+                        && majority.count >= 2*t+1 {
         // Else if 􏰀p ≥ 2􏰁 AND 􏰀i has received 2t + 1 next-votes for some value v ̸= ⊥ for period p−1􏰁
         //  i proposes v, which he propagates together with his period p credential.
-        user_i.update_vote(majority_vote);
-        println!("\tUser updates Vote: {:?}", majority_vote);
+        user_i.update_vote(majority.vote);
         /// CODE: network broadcast
-        println!("\tUser broadcasts (1b): {:?}", &user_i);
+        println!("\t[Step 1b] User broadcasts: {:?}", &user_i);
     } else {
     }
 
     // STEP 2: [Filtering Step]
-    // println!("\n[STEP 2: Filtering Step]");
-    if (p == 1) || (majority_message == MessageType::NEXT
-                    && majority_vote == Vote::NullVote
-                    && majority_message_vote_count >= 2*t+1) {
+    if (p == 1) || (majority.message == MessageType::NEXT
+                    && majority.vote == Vote::NullVote
+                    && majority.count >= 2*t+1) {
         // If p=1 or (p >= 2 AND i has received 2t+1 next-votes for ⊥ NullVote in period p-1)
         // i identifies himself as leader li,p for period p
         // and soft-votes the value v proposed by li,p;
         user_i.update_message_type(MessageType::SOFT);
-        println!("\tUser elects herself as leader, and SOFT-votes: {:?}", &user_i.vote);
-    } else if majority_message == MessageType::NEXT
-            && majority_vote != Vote::NullVote
-            && majority_message_vote_count >= 2*t+1 {
-        // STEP 2: [Filtering Step]
-        println!("\tUser SOFT-votes observed majority vote: {:?}", &user_i.vote);
-        // User i SOFT-votes v, the majority_vote
+        println!("\t[Step 2a] User elects herself as leader, and SOFT-votes: {:?}", &user_i.vote);
+    } else if majority.message == MessageType::NEXT
+            && majority.vote != Vote::NullVote
+            && majority.count >= 2*t+1 {
+        // User i SOFT-votes v, the majority.vote
+        println!("\t[Step 2b] User SOFT-votes observed majority vote: {:?}", &user_i.vote);
         user_i.update_message_type(MessageType::SOFT);
     } else {
     }
 
     // STEP 3: [Certifying Step]
     // If i sees 2t + 1 soft-votes for some value v ̸= ⊥, then i cert-votes v.
-    // println!("\n[STEP 3: Certifying Step]");
     let mut has_certified_vote = false;
-    if majority_message == MessageType::SOFT
-        && majority_vote != Vote::NullVote
-        && majority_message_vote_count >= 2*t+1 {
+    if (majority.message == MessageType::SOFT && majority.vote != Vote::NullVote && majority.count >= 2*t+1) {
         user_i.update_message_type(MessageType::CERT);
         has_certified_vote = true;
-        println!("\tUser: {:?} sees SOFT-vote majority, upgrades MessageType to: {:?}", user_i.user, user_i.message);
-        println!("\tUser broadcasts (3): {:?}", &user_i);
+        println!("\t[Step 3] User: {:?} sees SOFT-vote majority, upgrades MessageType to: {:?}", user_i.user, user_i.message);
+        println!("\t[Step 3] User broadcasts: {:?}", &user_i);
     } else {
     }
 
-
     // STEP 4: [Period's First Finishing Step]
-    // println!("\n[STEP 4: First Finishing Step]");
     // If i has certified some value v for period p, he next-votes v;
     if has_certified_vote {
         // user_i.update_message_type(MessageType::NEXT);
-        user_i.update_vote(majority_vote);
-        println!("\tUser CERT-votes (4): {:?}", &user_i.vote);
+        user_i.update_vote(majority.vote);
+        println!("\t[Step 4a] User CERT-votes: {:?}", &user_i.vote);
     } else {
         // Else he next-votes ⊥.
         user_i.update_message_type(MessageType::NEXT);
         user_i.update_vote(Vote::NullVote);
-        println!("\tUser broadcasts (4): {:?}", &user_i);
+        println!("\t[Step 4b] User broadcasts: {:?}", &user_i);
     }
 
     // STEP 5: [Period's Second Finishing Step]
-    // println!("\n[STEP 5: Second Finishing Step]");
-    if majority_message == MessageType::SOFT
-        && majority_message_vote_count >= 2*t+1
-        && majority_vote != Vote::NullVote
+    if majority.message == MessageType::SOFT
+        && majority.vote != Vote::NullVote
+        && majority.count >= 2*t+1
         && !has_certified_vote {
         // If i sees 2t + 1 soft-votes for some value v ̸= ⊥ for period p
         // and has not next-voted v in Step 4, then i next-votes v.
         user_i.update_message_type(MessageType::NEXT);
-        user_i.update_vote(majority_vote);
-        println!("\tUser NEXT-votes (4): {:?}", &user_i.vote);
+        user_i.update_vote(majority.vote);
+        println!("\t[Step 5] User NEXT-votes: {:?}", &user_i.vote);
     }
 
     // Return (Halting condition, User_sig)
@@ -195,70 +178,21 @@ fn algorand_agreement<'a>(p: u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (boo
 }
 
 
-
-
-fn vote_message_counter_fn<'a>(users: &Vec<Sig>) -> HashMap<MessageType, HashMap<Vote, u32>> {
-    //! DESCRIPTION:
-    //!     Creates a HashMap of MessageType[Vote], and respective counts
-    //! PARAMS:
-    //!     users: vector of peer votes (Sig) from previous period p-1
-    let mut messageDict: HashMap<MessageType, HashMap<Vote, u32>> = HashMap::new();
-    let mut voteDictSOFT: HashMap<Vote, u32> = HashMap::new();
-    let mut voteDictCERT: HashMap<Vote, u32> = HashMap::new();
-    let mut voteDictNEXT: HashMap<Vote, u32> = HashMap::new();
-    // HashMap::new() returns address, need to deference to mutate
-    use MessageType::{ SOFT, CERT, NEXT };
-    use Vote::{ Value, NullVote };
-    for u in users {
-        // iterate and count votes for each value.
-        match (&u.message, &u.vote ) {
-            (SOFT, Vote::Value(n)) => *voteDictSOFT.entry(Vote::Value(*n)).or_insert(0) += 1,
-            (CERT, Vote::Value(n)) => *voteDictCERT.entry(Vote::Value(*n)).or_insert(0) += 1,
-            (NEXT, Vote::Value(n)) => *voteDictNEXT.entry(Vote::Value(*n)).or_insert(0) += 1,
-            (SOFT, Vote::NullVote) => *voteDictSOFT.entry(NullVote).or_insert(0) += 1,
-            (CERT, Vote::NullVote) => *voteDictCERT.entry(NullVote).or_insert(0) += 1,
-            (NEXT, Vote::NullVote) => *voteDictNEXT.entry(NullVote).or_insert(0) += 1,
-        }
+pub fn print_sigs(period: String, users: &Vec<Sig>) {
+    println!("{}:", period);
+    for user in users.iter() {
+        println!("\tuser: {:?}\tvote: {:?}\tmessage: {:?}", user.user, user.vote, user.message);
     }
-    messageDict.insert(SOFT, voteDictSOFT);
-    messageDict.insert(CERT, voteDictCERT);
-    messageDict.insert(NEXT, voteDictNEXT);
-    messageDict
 }
 
 
-
-fn calc_majority_vote<'a>(vote_message_counter: &HashMap<MessageType, HashMap<Vote, u32>>) -> (MessageType, Vote, u32) {
-    //! DESCRIPTION:
-    //!     Check if user i received 2t + 1 next-votes for ⊥ (NullVote) in period p - 1
-    //!     count number of NullVotes, return majority: v or NullVote
-    //! PARAMS:
-    //!     vote_message_counter: reference to a HashMap of a HashMap: MessageType[Vote]
-    //! RETURN: Returns the (Key, Value) pair with the largest value in the hash_map
-    let mut maxMsg = &MessageType::SOFT;
-    let mut maxVote = &Vote::NullVote;
-    let mut maxVal = 0;
-    for (message_type, vote_dict) in vote_message_counter {
-        for (voteKey, val) in vote_dict {
-            if val > &maxVal {
-                maxMsg = message_type;
-                maxVote = voteKey;
-                maxVal = *val
-            }
-        }
-    }
-    (maxMsg.clone(), maxVote.clone(), maxVal)
-}
-
-
-
-fn halting_condition(t: u32, majority_message: &MessageType, majority_vote: &Vote, majority_message_vote_count: &u32) -> bool {
+pub fn halting_condition(t: u32, m: &MajorityVote) -> bool {
     // User i HALTS the moment he sees 2t + 1 cert-votes for some value v for the same period p,
     // and sets v to be his output. Those cert-votes form a certificate for v.
-    if *majority_message == MessageType::CERT
-        && *majority_message_vote_count >= 2*t+1
-        && *majority_vote != Vote::NullVote {
-        println!("User sees 2t + 1 CERT-votes for value: {:?}", *majority_vote);
+    if m.message == MessageType::CERT
+        && m.count >= 2*t+1
+        && m.vote != Vote::NullVote {
+        println!("User sees 2t + 1 CERT-votes for value: {:?}", m.vote);
         true
     } else {
         false
