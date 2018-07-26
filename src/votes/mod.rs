@@ -50,41 +50,68 @@ impl<'a> Sig<'a> {
     }
 }
 
-pub fn gossip<'a>() -> Vec<Sig<'a>> {
-    // let user_i = Sig {
-    //     user: &String::from("i"),
-    //     vote: Vote::Value(22),
-    //     message: MessageType::NEXT,
-    //     signature: signature(&String::from("idasdf"))
-    // };
-    // // NEXT demo
-    // let user_j = Sig::new(&"j", Vote::Value(33), MessageType::NEXT);
-    // let user_k = Sig::new(&"k", Vote::Value(33), MessageType::NEXT);
-    // let user_l = Sig::new(&"l", Vote::Value(33), MessageType::NEXT);
-    // let user_m = Sig::new(&"m", Vote::Value(33), MessageType::NEXT);
-    // let user_n = Sig::new(&"n", Vote::Value(33), MessageType::SOFT);
-    // let user_o = Sig::new(&"o", Vote::Value(33), MessageType::SOFT);
-    // let user_p = Sig::new(&"p", Vote::NullVote,  MessageType::NEXT);
-    // let user_q = Sig::new(&"q", Vote::NullVote,  MessageType::NEXT);
-    // let user_r = Sig::new(&"r", Vote::NullVote,  MessageType::NEXT);
-    // let user_s = Sig::new(&"s", Vote::NullVote,  MessageType::NEXT);
-    // SOFT demo
+pub fn gossip<'a>(gossip_type: String) -> Vec<Sig<'a>> {
+
+    let user_a = Sig::new(&"a", Vote::Value(11), MessageType::SOFT);
+    let user_b = Sig::new(&"b", Vote::Value(11), MessageType::SOFT);
+    let user_c = Sig::new(&"c", Vote::Value(11), MessageType::SOFT);
+    let user_d = Sig::new(&"d", Vote::Value(11), MessageType::SOFT);
+    let user_e = Sig::new(&"e", Vote::Value(11), MessageType::SOFT);
+    let user_f = Sig::new(&"f", Vote::Value(22), MessageType::SOFT);
+    let user_g = Sig::new(&"g", Vote::Value(22), MessageType::SOFT);
+    let user_h = Sig::new(&"h", Vote::Value(22), MessageType::SOFT);
     let user_i = Sig::new(&"i", Vote::Value(22), MessageType::SOFT);
+    // Duplicate votes, Value votes
     let user_j = Sig::new(&"j", Vote::Value(33), MessageType::SOFT);
     let user_k = Sig::new(&"k", Vote::Value(33), MessageType::SOFT);
     let user_l = Sig::new(&"l", Vote::Value(33), MessageType::SOFT);
     let user_m = Sig::new(&"m", Vote::Value(33), MessageType::SOFT);
     let user_n = Sig::new(&"n", Vote::Value(33), MessageType::SOFT);
     let user_o = Sig::new(&"o", Vote::Value(33), MessageType::SOFT);
-    let user_p = Sig::new(&"p", Vote::NullVote,  MessageType::SOFT);
-    let user_q = Sig::new(&"q", Vote::NullVote,  MessageType::SOFT);
-    let user_r = Sig::new(&"r", Vote::NullVote,  MessageType::NEXT);
-    let user_s = Sig::new(&"s", Vote::NullVote,  MessageType::NEXT);
-    let users: Vec<Sig> = vec![
-        user_i, user_j, user_k, user_l, user_m, user_n,
-        user_o, user_p, user_q, user_r, user_s,
-    ];
-    users
+    let user_p = Sig::new(&"p", Vote::Value(33), MessageType::SOFT);
+    let user_q = Sig::new(&"q", Vote::Value(33), MessageType::SOFT);
+    let user_r = Sig::new(&"r", Vote::Value(33), MessageType::SOFT);
+    let user_s = Sig::new(&"s", Vote::Value(33), MessageType::SOFT);
+    let user_t = Sig::new(&"t", Vote::Value(33), MessageType::NEXT);
+    let user_u = Sig::new(&"u", Vote::Value(44), MessageType::NEXT);
+    let user_v = Sig::new(&"v", Vote::Value(44), MessageType::NEXT);
+    // Duplicate votes, NullVote
+    let _user_j = Sig::new(&"j", Vote::NullVote, MessageType::SOFT);
+    let _user_k = Sig::new(&"k", Vote::NullVote, MessageType::SOFT);
+    let _user_l = Sig::new(&"l", Vote::NullVote, MessageType::SOFT);
+    let _user_m = Sig::new(&"m", Vote::NullVote, MessageType::SOFT);
+    let _user_n = Sig::new(&"n", Vote::NullVote, MessageType::SOFT);
+    let _user_o = Sig::new(&"o", Vote::NullVote, MessageType::SOFT);
+    let _user_p = Sig::new(&"p", Vote::NullVote, MessageType::SOFT);
+    let _user_q = Sig::new(&"q", Vote::NullVote, MessageType::SOFT);
+    let _user_r = Sig::new(&"r", Vote::NullVote, MessageType::SOFT);
+    let _user_s = Sig::new(&"s", Vote::NullVote, MessageType::SOFT);
+    let _user_t = Sig::new(&"t", Vote::NullVote, MessageType::NEXT);
+    let _user_u = Sig::new(&"u", Vote::NullVote, MessageType::NEXT);
+    let _user_v = Sig::new(&"v", Vote::NullVote, MessageType::NEXT);
+
+    let user_w = Sig::new(&"w", Vote::NullVote, MessageType::NEXT);
+    let user_x = Sig::new(&"x", Vote::NullVote, MessageType::NEXT);
+    let user_y = Sig::new(&"y", Vote::NullVote, MessageType::NEXT);
+    let user_z = Sig::new(&"z", Vote::NullVote, MessageType::NEXT);
+
+    if gossip_type == "value" {
+        let users: Vec<Sig> = vec![
+            user_a, user_b, user_c, user_d, user_e, user_f, user_g, user_h, user_i,
+            user_j, user_k, user_l, user_m, user_n, user_o, user_p,
+            user_q, user_r, user_s, user_t, user_u, user_v,
+            user_w, user_x, user_y, user_z,
+        ];
+        users
+    } else {
+        let users: Vec<Sig> = vec![
+            user_a, user_b, user_c, user_d, user_e, user_f, user_g, user_h, user_i,
+            _user_j, _user_k, _user_l, _user_m, _user_n, _user_o, _user_p,
+            _user_q, _user_r, _user_s, _user_t, _user_u, _user_v,
+            user_w, user_x, user_y, user_z,
+        ];
+        users
+    }
 }
 
 fn maxHashMap<K, V>(hash_map: HashMap<K, V>) -> (K, V)

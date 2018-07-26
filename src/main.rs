@@ -21,35 +21,65 @@ use votes::{
 
 
 fn main() {
-    let mut users: Vec<Sig> = gossip();
-    // mutable vector: each Sig mutates
-    let mut users_iter: Vec<Sig> = gossip();
-    // Purely for iteration only.
+    // let mut users: Vec<Sig> = gossip(String::from("nullvote"));
+    // let users_iter: Vec<Sig> = gossip(String::from("nullvote"));
+
+    let mut users: Vec<Sig> = gossip(String::from("value"));
+    let users_iter: Vec<Sig> = gossip(String::from("value"));
+
+    // mut users: mutalbe vector: each sig mutates
+    // user_iter is purely for iteration only.
     // Can't mutate vector which you are iterating over
 
     // Begin Algorand Rounds
-    let p = 2;
-    for (i, user_i) in users_iter.clone().into_iter().enumerate() {
-        println!("==================BEGIN ROUND - USER: {:?}===================", &user_i.user);
-        let (halt, new_user) = algorand_agreement(&p, &users, user_i);
-        let replace_user = users.remove(0);
-        if replace_user != new_user {
-            println!("\n\n\t=======REPLACED USER: {:?}", replace_user);
-            println!("\t========WITH USER: {:?}", new_user);
+    let mut p = 1;
+    let mut halt = false;
+    let mut user_hald = false;
+    let mut cert_count = 0;
+
+
+    while !halt && p < 10 {
+        println!("\n================== BEGIN ROUND {} ===================", &p);
+        cert_count = 0;
+        for (i, user_i) in users_iter.clone().into_iter().enumerate() {
+            println!("\n------ USER: {:?} ------", &user_i.user);
+            let (user_halt, new_user) = algorand_agreement(p, &users, user_i);
+            if user_halt {
+                cert_count = cert_count + 1;
+            }
+            let replace_user = users.remove(0); // pop the 1st index
+            if replace_user != new_user {
+                println!("\n\t>>> REPLACED USER: {:?}", replace_user);
+                println!("\t>>> WITH USER: {:?}", new_user);
+            }
+            users.push(new_user);
         }
-        users.push(new_user);
-        println!("\n========================END ROUND===========================\n");
+        println!("\n================ END ROUND {} =================\n", &p);
+        if cert_count == users.len() {
+            println!("Algorand halted early successfully in round: {}.", &p);
+            println!("All users produced certificate votes.");
+            halt = true;
+        }
+        p = p + 1;
+        print_sigs(String::from("Initial Sigs"), &users_iter);
+        print_sigs(String::from("Ending Sigs"), &users);
     }
 
-    // println!("\n\nInitial Sigs: {:?}", users_iter.iter().map(|x| (x.vote, x.message)));
-    println!("End round Sigs: {:?}", users.into_iter().map(|x| (x.vote, x.message)));
 
+}
+
+
+fn print_sigs(period: String, users: &Vec<Sig>) {
+    println!("{}:", period);
+    for user in users.iter() {
+        println!("\tuser: {:?}\tvote: {:?}\tmessage: {:?}", user.user, user.vote, user.message);
+    }
 }
 
 
 
 
-fn algorand_agreement<'a>(p: &u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bool, Sig<'a>) {
+fn algorand_agreement<'a>(p: u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bool, Sig<'a>) {
     //! DESCRIPTION:
     //!     Algorand's Byzantine Agreement Protocol
     //!     Page 4: Jing Chen, Sergey Gorbunov, Silvio Micali, Georgios Vlachos (2018)
@@ -58,33 +88,35 @@ fn algorand_agreement<'a>(p: &u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bo
     //!     users: vector of other users's Sig messages (user, vote, message, signature)
     //!     user_i: user's Sig
 
-    let vote_message_counts: HashMap<MessageType, HashMap<Vote, u32>> = vote_message_counter(&users);
+    let vote_message_counts: HashMap<MessageType, HashMap<Vote, u32>> = vote_message_counter_fn(&users);
 
     let (majority_message, majority_vote, majority_message_vote_count) = calc_majority_vote(&vote_message_counts);
-    println!("\nMajority Vote Observed:\n\tMajority message: {:?}\n\tMajority vote: {:?}\n\tCount: {:?}",
+    println!("Majority Vote Observed:\n\tMajority message: {:?}\n\tMajority vote: {:?}\n\tCount: {:?}",
              majority_message, majority_vote, majority_message_vote_count);
+    println!("User:\n\tmessage: {:?}\n\tvote: {:?}", user_i.message, user_i.vote);
 
     let t = 1; // Number of malicious nodes
     // How do you know how many malicious nodes there are?
 
     if halting_condition(t, &majority_message, &majority_vote, &majority_message_vote_count) {
+        user_i.update_vote(majority_vote);
+        user_i.update_message_type(majority_message);
         return (true, user_i)
     } else {
         println!("No halting condition (majority CERT-vote) encountered, resuming consensus protocol.");
     }
+    if p == 1 { println!("\nPeriod: 1") }
 
     // STEP 1: [Value Proposal]
-    println!("\n[STEP 1: Value Proposal]");
-    println!("\tUser original Vote: {:?}", &user_i);
-    if (*p == 1) || (majority_message == MessageType::NEXT
+    // println!("\n[STEP 1: Value Proposal]");
+    if (p == 1) || (majority_message == MessageType::NEXT
                     && majority_vote == Vote::NullVote
                     && majority_message_vote_count >= 2*t+1) {
         // If p=1 or (p >= 2 AND i has received 2t+1 next-votes for ⊥ NullVote in period p-1)
         // then i proposes vi, which he propagates together with his period p credential;
-        if *p == 1 { println!("\nPeriod: 1") }
         /// CODE: network broadcast
         println!("\tUser broadcasts (1a): {:?}", &user_i);
-    } else if (*p >= 2) && majority_message == MessageType::NEXT
+    } else if (p >= 2) && majority_message == MessageType::NEXT
                         && majority_vote != Vote::NullVote
                         && majority_message_vote_count >= 2*t+1 {
         // Else if 􏰀p ≥ 2􏰁 AND 􏰀i has received 2t + 1 next-votes for some value v ̸= ⊥ for period p−1􏰁
@@ -97,8 +129,8 @@ fn algorand_agreement<'a>(p: &u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bo
     }
 
     // STEP 2: [Filtering Step]
-    println!("\n[STEP 2: Filtering Step]");
-    if (*p == 1) || (majority_message == MessageType::NEXT
+    // println!("\n[STEP 2: Filtering Step]");
+    if (p == 1) || (majority_message == MessageType::NEXT
                     && majority_vote == Vote::NullVote
                     && majority_message_vote_count >= 2*t+1) {
         // If p=1 or (p >= 2 AND i has received 2t+1 next-votes for ⊥ NullVote in period p-1)
@@ -118,7 +150,7 @@ fn algorand_agreement<'a>(p: &u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bo
 
     // STEP 3: [Certifying Step]
     // If i sees 2t + 1 soft-votes for some value v ̸= ⊥, then i cert-votes v.
-    println!("\n[STEP 3: Certifying Step]");
+    // println!("\n[STEP 3: Certifying Step]");
     let mut has_certified_vote = false;
     if majority_message == MessageType::SOFT
         && majority_vote != Vote::NullVote
@@ -132,12 +164,12 @@ fn algorand_agreement<'a>(p: &u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bo
 
 
     // STEP 4: [Period's First Finishing Step]
-    println!("\n[STEP 4: First Finishing Step]");
+    // println!("\n[STEP 4: First Finishing Step]");
     // If i has certified some value v for period p, he next-votes v;
     if has_certified_vote {
-        user_i.update_message_type(MessageType::NEXT);
+        // user_i.update_message_type(MessageType::NEXT);
         user_i.update_vote(majority_vote);
-        println!("\tUser NEXT-votes (4): {:?}", &user_i.vote);
+        println!("\tUser CERT-votes (4): {:?}", &user_i.vote);
     } else {
         // Else he next-votes ⊥.
         user_i.update_message_type(MessageType::NEXT);
@@ -146,7 +178,7 @@ fn algorand_agreement<'a>(p: &u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bo
     }
 
     // STEP 5: [Period's Second Finishing Step]
-    println!("\n[STEP 5: Second Finishing Step]");
+    // println!("\n[STEP 5: Second Finishing Step]");
     if majority_message == MessageType::SOFT
         && majority_message_vote_count >= 2*t+1
         && majority_vote != Vote::NullVote
@@ -165,7 +197,7 @@ fn algorand_agreement<'a>(p: &u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bo
 
 
 
-fn vote_message_counter<'a>(users: &Vec<Sig>) -> HashMap<MessageType, HashMap<Vote, u32>> {
+fn vote_message_counter_fn<'a>(users: &Vec<Sig>) -> HashMap<MessageType, HashMap<Vote, u32>> {
     //! DESCRIPTION:
     //!     Creates a HashMap of MessageType[Vote], and respective counts
     //! PARAMS:
@@ -224,8 +256,9 @@ fn halting_condition(t: u32, majority_message: &MessageType, majority_vote: &Vot
     // User i HALTS the moment he sees 2t + 1 cert-votes for some value v for the same period p,
     // and sets v to be his output. Those cert-votes form a certificate for v.
     if *majority_message == MessageType::CERT
-        && *majority_message_vote_count >= 2*t+1 && *majority_vote != Vote::NullVote {
-        println!("User sees 2t + 1 CERT-votes for some value v");
+        && *majority_message_vote_count >= 2*t+1
+        && *majority_vote != Vote::NullVote {
+        println!("User sees 2t + 1 CERT-votes for value: {:?}", *majority_vote);
         true
     } else {
         false
