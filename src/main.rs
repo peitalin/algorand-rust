@@ -81,7 +81,7 @@ fn main() {
 
 
 
-fn algorand_agreement<'a>(p: u32, t: u32, users: &Vec<Sig>, mut user_i: Sig<'a>) -> (bool, Sig<'a>) {
+fn algorand_agreement<'a>(p: u32, t: u32, users: &Vec<Sig>, mut user_i: Sig) -> (bool, Sig) {
     //! DESCRIPTION:
     //!     Algorand's Byzantine Agreement Protocol
     //!     Page 4: Jing Chen, Sergey Gorbunov, Silvio Micali, Georgios Vlachos (2018)
